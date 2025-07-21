@@ -1,0 +1,7 @@
+{
+  "name": "csv-processor",
+  "version": "1.0.0",
+  "dependencies": {
+    "csv-parse": "^5.0.4"
+  }
+}
