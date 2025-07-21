@@ -1,22 +1,59 @@
 body {
-    font-family: Arial, sans-serif;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-.container {
-    text-align: center;
+.navbar {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-input, button {
-    margin: 10px;
-    padding: 8px;
+.card {
+    border: none;
+    border-radius: 10px;
+    transition: transform 0.3s ease;
 }
 
-#result {
-    margin-top: 20px;
-    padding: 15px;
-    border: 1px solid #ddd;
-    min-height: 100px;
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.upload-card {
+    border: 2px dashed #dee2e6;
+    transition: all 0.3s ease;
+}
+
+.upload-card:hover {
+    border-color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.05);
+}
+
+.progress {
+    height: 10px;
+    border-radius: 5px;
+}
+
+#dataPreview th {
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+#emptyResult {
+    border: 2px dashed #dee2e6;
+    border-radius: 10px;
+}
+
+.btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 1.1rem;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1.25rem;
+    }
+    
+    .display-6 {
+        font-size: 2rem;
+    }
 }
