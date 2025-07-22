@@ -1,8 +1,24 @@
 [build]
   publish = "public"
   functions = "netlify/functions"
+  command = "cd netlify/functions && npm install"
 
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["netlify/functions/*.js"]
+  timeout = 30  # 增加超时时间
+
+# 跨域配置
 [[headers]]
   for = "/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"
+
+# 重定向规则（可选）
+[[redirects]]
+  from = "/uploads/*"
+  to = "/.netlify/functions/save-to-github"
+  status = 200
+  force = false

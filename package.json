@@ -2,6 +2,7 @@
   "name": "csv-processor",
   "version": "1.0.0",
   "dependencies": {
+    "@octokit/rest": "^22.0.0",
     "csv-parse": "^5.0.4",
     "csv-stringify": "^6.6.0"
   }

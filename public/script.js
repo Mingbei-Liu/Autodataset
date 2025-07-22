@@ -18,56 +18,41 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 表单提交处理
-    async function handleFormSubmit(e) {
-        e.preventDefault();
-        
-        // 获取文件
-        const positiveFile = document.getElementById('positiveFile').files[0];
-        const negativeFile = document.getElementById('negativeFile').files[0];
-        const nonCorrelatedFile = document.getElementById('nonCorrelatedFile').files[0];
-        
+    async function handleUpload() {
+        const files = {
+            positive: document.getElementById('positiveFile').files[0],
+            negative: document.getElementById('negativeFile').files[0],
+            nonCorrelated: document.getElementById('nonCorrelatedFile').files[0]
+        };
+
         // 验证文件
-        if (!validateFiles(positiveFile, negativeFile, nonCorrelatedFile)) {
+        for (const [type, file] of Object.entries(files)) {
+            if (!file) {
+            alert(`请上传 ${type} 文件`);
             return;
-        }
-        
-        try {
-            // UI 状态更新
-            setUploadState('processing');
-            
-            // 准备表单数据
-            const formData = new FormData();
-            formData.append('positive', positiveFile);
-            formData.append('negative', negativeFile);
-            formData.append('nonCorrelated', nonCorrelatedFile);
-            
-            // 显示上传进度
-            showProgressBars();
-            
-            // 发送请求
-            const response = await fetch('/.netlify/functions/process-csv', {
-                method: 'POST',
-                body: formData
-            });
-            
-            // 处理响应
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `服务器错误: ${response.status}`);
             }
-            
-            const result = await response.json();
-            
-            // 缓存数据并显示结果
-            currentProcessedData = result;
-            displayResults(result);
-            
+            if (!file.name.endsWith('.csv')) {
+            alert(`${type} 文件必须是CSV格式`);
+            return;
+            }
+        }
+
+        try {
+            const formData = new FormData();
+            for (const [type, file] of Object.entries(files)) {
+            formData.append(type, file);
+            }
+
+            const response = await fetch('/.netlify/functions/save-to-github', {
+            method: 'POST',
+            body: formData
+            });
+
+            if (!response.ok) throw new Error('上传失败');
+            alert('文件已成功上传到GitHub');
         } catch (error) {
-            console.error('上传失败:', error);
-            showError(`上传失败: ${error.message}`);
-        } finally {
-            setUploadState('ready');
-            hideProgressBars();
+            console.error('上传错误:', error);
+            alert(`上传失败: ${error.message}`);
         }
     }
     
