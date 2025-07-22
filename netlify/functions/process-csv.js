@@ -1,139 +1,102 @@
-const { parse, stringify } = require('csv-parse/sync');
-const fs = require('fs');
-const path = require('path');
+const { parse } = require('csv-parse/sync');
 
-// 模拟"数据库" - 实际应用中应该使用真实数据库
-let database = {
+// 内存数据库
+const database = {
     positive: [],
     negative: [],
     nonCorrelated: []
 };
 
-// 从模拟数据库加载现有数据
-function loadDatabase() {
-    try {
-        // 这里应该是从真实数据库加载的逻辑
-        // 为了示例，我们返回模拟数据
-        return {
-            positive: [],
-            negative: [],
-            nonCorrelated: []
-        };
-    } catch (error) {
-        console.error('加载数据库失败:', error);
-        return {
-            positive: [],
-            negative: [],
-            nonCorrelated: []
-        };
-    }
-}
-
-// 保存数据到模拟数据库
-function saveToDatabase(data) {
-    try {
-        // 这里应该是保存到真实数据库的逻辑
-        // 为了示例，我们只是合并到内存中的数据
-        database.positive = database.positive.concat(data.positive);
-        database.negative = database.negative.concat(data.negative);
-        database.nonCorrelated = database.nonCorrelated.concat(data.nonCorrelated);
-        
-        return true;
-    } catch (error) {
-        console.error('保存到数据库失败:', error);
-        return false;
-    }
-}
-
 exports.handler = async (event) => {
-    // 加载现有数据
-    database = loadDatabase();
-    
-    try {
-        // 从multipart表单数据中解析文件
-        const boundary = event.headers['content-type'].split('=')[1];
-        const body = Buffer.from(event.body, 'base64').toString('binary');
-        const parts = body.split(`--${boundary}`);
-        
-        const files = {
-            positive: null,
-            negative: null,
-            nonCorrelated: null
+    // 只处理POST请求
+    if (event.httpMethod !== 'POST') {
+        return {
+            statusCode: 405,
+            body: JSON.stringify({ error: '只允许POST请求' })
         };
-        
-        // 解析每个部分
+    }
+
+    try {
+        // 检查内容类型
+        const contentType = event.headers['content-type'] || '';
+        if (!contentType.includes('multipart/form-data')) {
+            return {
+                statusCode: 400,
+                body: JSON.stringify({ error: '无效的内容类型，需要multipart/form-data' })
+            };
+        }
+
+        // 解析表单数据
+        const boundary = contentType.split('boundary=')[1];
+        const body = Buffer.from(event.body, 'base64');
+        const parts = body.toString().split(`--${boundary}`);
+
+        const files = {};
         parts.forEach(part => {
-            if (part.includes('filename="') && part.includes('name="')) {
-                const nameMatch = part.match(/name="([^"]+)"/);
-                const filenameMatch = part.match(/filename="([^"]+)"/);
-                const contentMatch = part.match(/\r\n\r\n([\s\S]*)\r\n--/);
-                
-                if (nameMatch && filenameMatch && contentMatch) {
-                    const name = nameMatch[1];
-                    const content = contentMatch[1].trim();
-                    files[name] = content;
-                }
+            const match = part.match(/name="([^"]+)"[\s\S]*?filename="([^"]+)"[\s\S]*?\r\n\r\n([\s\S]*?)\r\n--/);
+            if (match) {
+                files[match[1]] = match[3].trim();
             }
         });
-        
-        // 检查所有文件是否都已上传
-        if (!files.positive || !files.negative || !files.nonCorrelated) {
-            throw new Error('请上传所有分类的文件');
+
+        // 检查必需文件
+        const required = ['positive', 'negative', 'nonCorrelated'];
+        for (const field of required) {
+            if (!files[field]) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({ error: `缺少${field}文件` })
+                };
+            }
         }
-        
-        // 解析CSV文件
-        const parsedData = {
-            positive: parse(files.positive, { columns: true, skip_empty_lines: true }),
-            negative: parse(files.negative, { columns: true, skip_empty_lines: true }),
-            nonCorrelated: parse(files.nonCorrelated, { columns: true, skip_empty_lines: true })
-        };
-        
-        // 为每条数据添加分类标签
-        parsedData.positive.forEach(row => row.category = 'positive');
-        parsedData.negative.forEach(row => row.category = 'negative');
-        parsedData.nonCorrelated.forEach(row => row.category = 'nonCorrelated');
-        
-        // 合并数据
-        const mergedData = [
-            ...parsedData.positive,
-            ...parsedData.negative,
-            ...parsedData.nonCorrelated
-        ];
-        
-        // 保存到数据库
-        if (!saveToDatabase(parsedData)) {
-            throw new Error('保存数据失败');
+
+        // 处理CSV数据
+        const results = {};
+        for (const [field, content] of Object.entries(files)) {
+            try {
+                results[field] = parse(content, {
+                    columns: true,
+                    skip_empty_lines: true,
+                    trim: true
+                });
+                // 添加分类标签
+                results[field].forEach(row => row.category = field);
+                // 存入"数据库"
+                database[field].push(...results[field]);
+            } catch (error) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({ error: `${field}文件解析失败: ${error.message}` })
+                };
+            }
         }
-        
-        // 准备响应数据
-        const responseData = {
-            success: true,
-            positiveCount: parsedData.positive.length,
-            negativeCount: parsedData.negative.length,
-            nonCorrelatedCount: parsedData.nonCorrelated.length,
-            totalCount: mergedData.length,
-            sampleData: mergedData.slice(0, 5), // 返回前5条作为示例
-            mergedData: mergedData
-        };
-        
+
+        // 返回成功响应
         return {
             statusCode: 200,
-            body: JSON.stringify(responseData),
-            headers: {
-                'Content-Type': 'application/json'
-            }
+            body: JSON.stringify({
+                success: true,
+                counts: {
+                    positive: results.positive.length,
+                    negative: results.negative.length,
+                    nonCorrelated: results.nonCorrelated.length
+                },
+                sample: [
+                    ...results.positive.slice(0, 1),
+                    ...results.negative.slice(0, 1),
+                    ...results.nonCorrelated.slice(0, 1)
+                ]
+            })
         };
-        
+
     } catch (error) {
+        console.error('服务器错误:', error);
         return {
             statusCode: 500,
-            body: JSON.stringify({
-                success: false,
-                error: error.message
-            }),
-            headers: {
-                'Content-Type': 'application/json'
-            }
+            body: JSON.stringify({ 
+                error: '处理请求时出错',
+                details: error.message 
+            })
         };
     }
 };
